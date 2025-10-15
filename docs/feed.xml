@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>COMS30007 - Machine Learning</title>
+    <description>This website was built completely using emacs org-mode based on the excellent work by Steve V. Miller</description>
+    <link>https://carlhenrikek.github.io/COMS30007/</link>
+    <atom:link href="https://carlhenrikek.github.io/COMS30007/feed.xml" rel="self" type="application/rss+xml"/>
+    <pubDate>Wed, 15 Oct 2025 18:23:40 +0100</pubDate>
+    <lastBuildDate>Wed, 15 Oct 2025 18:23:40 +0100</lastBuildDate>
+    <generator>Jekyll v4.4.1</generator>
+    
+  </channel>
+</rss>
