@@ -1,0 +1,631 @@
+% Created 2025-11-05 Wed 10:09
+% Intended LaTeX compiler: pdflatex
+\documentclass[]{beamer}
+			  \usepackage{mdframed}
+			  \usepackage{tcolorbox}\usepackage{etoolbox}
+			  \BeforeBeginEnvironment{minted}{\begin{tcolorbox}[title=Code]}\AfterEndEnvironment{minted}{\end{tcolorbox}}
+			  \newenvironment{question}{\begin{tcolorbox}[colback=blue!5!white,colframe=blue!75!black,title={\bf Question }]}{\end{tcolorbox}}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage[english]{babel}
+\usepackage{minted} \usepackage[outputdir=.]{minted} \definecolor{CamBlue}{RGB}{163,193,173} \setbeamercolor{frametitle}{bg=CamBlue} \usepackage[orientation=landscape,size=custom,width=16,height=9,scale=0.5]{beamerposter} \graphicspath{{./bin/lectures/07/},{./bin/lectures/04/},{./bin/lectures/06/}} \usepackage{resizegather} \usepackage{cancel}
+\usetheme{metropolis}
+\author{Carl Henrik Ek}
+\date{5th of November, 2025}
+\title{Machine Learning and the Physical World}
+\subtitle{Lecture 8 : Probabilistic Numerics}
+\author{\texorpdfstring{Carl Henrik Ek - \url{che29@cam.ac.uk}}{Carl Henrik Ek}} \institute[INST]{\url{http://carlhenrik.com}} \titlegraphic{\includegraphics[height=0.7cm]{bin/cambridge_logo.png}} \usepackage{mathtools} \usepackage{graphicx} \mathtoolsset{showonlyrefs} \usepackage{tikz} \usetikzlibrary{arrows,shadows,shapes,backgrounds,decorations,snakes,fit,calc,timeline} \usepackage{tikz-3dplot} \usepackage{resizegather} \usepackage{xmpmulti} \usepackage{mathtools} \usefonttheme[onlymath]{serif} \PassOptionsToPackage{hyperref,x11names}{xcolor} \definecolor{electricblue}{HTML}{05ADF3} \usepackage{tocloft} \renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}} \usepackage[breaklinks=true,linktocpage,xetex]{hyperref} \hypersetup{colorlinks, citecolor=electricblue,filecolor=electricblue,linkcolor=electricblue,urlcolor=electricblue} \metroset{background=light,bloc=empty,progressbar=frametitle,block=empty} \usepackage[citestyle=authoryear-icomp, maxcitenames=1, maxbibnames=4, doi=false, isbn=false, eprint=false, bibstyle=authoryear, backend=bibtex, hyperref=true, url=false, natbib=true]{biblatex} \addbibresource{~/Dropbox/work/bibliography/references.bib}
+\hypersetup{
+ pdfauthor={Carl Henrik Ek},
+ pdftitle={Machine Learning and the Physical World},
+ pdfkeywords={},
+ pdfsubject={},
+ pdfcreator={Emacs 30.2 (Org mode 9.7.11)}, 
+ pdflang={English}}
+\begin{document}
+
+\maketitle
+\begin{frame}[label={sec:orgeeb76e8}]{}
+\begin{center}
+\includegraphics[height=0.7\textheight]{./bin/lectures/02/distribution.png}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org871db68}]{What do we do with uncertainty?}
+\begin{center}
+\includegraphics[height=0.7\textheight]{bin/lectures/07/headinthesand.png}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org9184c3c}]{Bayesian Optimisation}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/06/bo-aq-int-ei-4.png}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org4418ebf}]{}
+\begin{center}
+\includegraphics[height=0.7\textheight]{uncertaintyquantification02.png}
+\end{center}
+\[
+y_i = f_i + \epsilon
+\]
+\end{frame}
+\begin{frame}[label={sec:org4e329a5}]{}
+\begin{quote} %% Poincare
+"The need for probability only arises out of uncertainty: It has no place if we are certain that we know all aspects of a problem. \alert{But our lack of knowledge also must not be complete, otherwise we would have nothing to evaluate}. There is thus a spectrum of degrees of uncertainty. While the probability for the sixth decimal digit of a number in a table of logarithms to equal 6 is 1/10 a priori, in reality, all aspects of the corresponding problem are well determined, and, if we wanted to make the effort, we could find out its exact value. \alert{The same holds for interpolation, for the integration methods of Cotes or Gauss, etc}"
+
+-- Henri Poincare, 1896
+\end{quote}
+\end{frame}
+\begin{frame}[label={sec:org291e501}]{Uncertainty Quantification}
+\begin{description}[<+->]
+\item[{Aleatoric/Stochastic}] "Randomness" inherent in system, or noise in our measurement of system
+\item[{Epistemic}] Uncertainty related to our ignorance of a the underlying system
+\item[{Computational}] \emph{Uncertainty related to finite computation, or intractable computations}
+\end{description}
+\end{frame}
+\begin{frame}[label={sec:org5865480}]{}
+\begin{center}
+Data + Model \(\overbrace{\rightarrow}^{Compute}\) Prediction
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:orga6da087}]{Computational Decisions}
+\begin{itemize}[<+->]
+\item Computation is expensive, how much knowledge will I gain from computing more?
+\item What should I compute in order to reduce my uncertainty as much as possible?
+\item How much should I trust the computation I have done?
+\item How precise should I do down-stream tasks based on the information from a specific computation?
+\end{itemize}
+\end{frame}
+\begin{frame}[label={sec:orgac0817f}]{Why Probabilistic Numerics?}
+\begin{quote} %% Von Neumann
+"[round-off errors] are strictly very complicated but uniquely defined number theoretical functions [of the inputs], yet our ignorance of their true nature is such that we best treat them as random variables."
+
+-- \cite{neumann-1947-numer-inver}
+\end{quote}
+\end{frame}
+\section{I believe in\ldots{}}
+\label{sec:org922d249}
+\begin{frame}[label={sec:org302ef37}]{}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/forrester.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org0abf879}]{Formalisation [\cite{cockayne17_bayes_probab_numer_method}]}
+\begin{center}
+\includegraphics[height=0.6\textheight]{./bin/lectures/07/statisticallearning0.pdf}
+\label{}
+\end{center}
+
+\[
+F : p(\mathcal{D}) \rightarrow p(\mathcal{Y}\vert \mathcal{X})
+\]
+\end{frame}
+\begin{frame}[label={sec:orgca737f5}]{Formalisation [\cite{cockayne17_bayes_probab_numer_method}]}
+\begin{center}
+\includegraphics[height=0.6\textheight]{./bin/lectures/07/statisticallearning0_1.pdf}
+\label{}
+\end{center}
+
+\[
+A\circ\mathcal{S} \approx F\circ p(\mathcal{D})
+\]
+\end{frame}
+\begin{frame}[label=cockayne4]{Formalisation}
+\begin{center}
+\includegraphics[height=0.6\textheight]{./bin/lectures/07/statisticallearning5.pdf}
+\label{}
+\end{center}
+
+\[
+A\circ S\circ p(\mathcal{D}) \approx p(\mathcal{D})
+\]
+\end{frame}
+\begin{frame}[label={sec:org224daaf}]{Formalisation [\cite{cockayne17_bayes_probab_numer_method}]}
+\begin{center}
+\includegraphics[height=0.6\textheight]{./bin/lectures/07/statisticallearning0_2.pdf}
+\label{}
+\end{center}
+
+\[
+A\circ S \circ p(\mathcal{D}) \approx F\circ p(\mathcal{D})
+\]
+\end{frame}
+\begin{frame}[label={sec:org6d25258}]{Bayesian Optimisation}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/06/bo-aq-int-ei-4.png}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:orgcc47e40}]{Bayesian Optimisation}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/statisticallearning_bo.pdf}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org2edccdd}]{Formalisation [\cite{cockayne17_bayes_probab_numer_method}]}
+\begin{center}
+\includegraphics[height=0.6\textheight]{./bin/lectures/07/statisticallearning0_2.pdf}
+\label{}
+\end{center}
+
+\[
+A\circ S \circ p(\mathcal{D}) \approx F\circ p(\mathcal{D})
+\]
+\end{frame}
+\begin{frame}[label={sec:org68615e5}]{Numerical Computations\footnote{\url{https://www.cs.toronto.edu/\~duvenaud/talks/odes\_runge\_kutta\_nips.pdf}}}
+\begin{description}
+\item[{Linear Algebra}] given \(As=y\) estimate \(x\) s.t. \(Ax=b\)
+\item[{Optimisation}] given \(\nabla f(x_i)\) estimate \(x\) s.t. \(\nabla f(x) = 0\)
+\item[{Analysis}] given \(f(x,t)\) estimate \(x(t)\) s.t. \(\textrm{d}x = f(x,t)\)
+\item[{Quadrature}] given \(f(x_i)\) estimate \(\int_{a}^b f(x)\textrm{d}x\)
+\end{description}
+\end{frame}
+\begin{frame}[label={sec:org32c69e7}]{Quantity of Interest}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/forrester_integrate.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:orgefe7608}]{}
+\begin{quote} %% Integration
+Integration is a significant numerical problem in many fields of science and engineering. It is a key step in inference, where it is encountered when averaging over the many states of the world consistent with observed data. Indeed, a provocative Bayesian view is that integration is the single challenge separating us from systems that fully automate statistics. More speculatively still, such systems may even exhibit artificial intelligence (ai).
+
+-- Hennig, Osbourne, Kersting
+\end{quote}
+\end{frame}
+\begin{frame}[label={sec:org9e46181}]{Integration}
+\[
+       F := \int f(x) \textrm{d}\nu(x)
+       \]
+\begin{itemize}
+\item \(\nu(x)\) is the measure that we are integrating over
+\end{itemize}
+\end{frame}
+\begin{frame}[label={sec:orgecef624}]{Integration}
+\[
+\underbrace{p(\mathcal{D})}_{F} = \int \underbrace{p(\mathcal{D}\mid \theta)}_{f(\theta)} \underbrace{p(\theta) \textrm{d}\theta}_{\textrm{d}\nu(\theta)}
+\]
+\begin{itemize}
+\item marginalisation\footnote{think of computing the evidence} is integration over the prior probability measure on the parameter
+\end{itemize}
+\end{frame}
+\begin{frame}[label={sec:org61397d4}]{Quadrature [\cite{cockayne17_bayes_probab_numer_method}]}
+\begin{center}
+\includegraphics[height=0.6\textheight]{./bin/lectures/07/statisticallearning7.pdf}
+\label{}
+\end{center}
+
+\[
+A\circ\mathcal{S} \approx \int f(x)\textrm{d}x
+\]
+\end{frame}
+\begin{frame}[label={sec:orgc5f5c3b}]{Quadrature}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/quadrature0.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org05c6810}]{Quadrature}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/quadrature1.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org4132c1e}]{Numerical Computation}
+\begin{quote} %% Definition
+A numerical method \alert{estimates} a function's \alert{latent} property \alert{given} the result of computations.
+\end{quote}
+\begin{onlyenv}<2->
+\(\frac{\text{Numerical algorithms}}{\text{Statistical inference}}\) takes data in the form of \(\frac{\text{evaluations of computations}}{\text{measurements of observed variables}}\) and aims to return predictions of the quantity of interest.
+\end{onlyenv}
+\begin{onlyenv}<3->
+Should we think about computation as inference?
+\end{onlyenv}
+\end{frame}
+\begin{frame}[label={sec:org0c406c8}]{Use of Computational Uncertainty}
+\[
+p(\hat{f} \mid S, A)
+\]
+
+\begin{description}[<+->]
+\item[{Decision}] which algorithm to use when
+\item[{Decision}] efficient use of expensive algorithms
+\item[{Decision}] when to stop computation
+\item[{Decision}] effect on downstream tasks
+\end{description}
+\end{frame}
+\section{Bayesian Quadrature}
+\label{sec:org243fe43}
+\begin{frame}[label=indefiniteintegral]{Quantity of interest}
+\[
+F := \int_{-3}^3 \underbrace{e^{-(sin(3x))^2-x^2}}_{f(x)}\textrm{d}x
+\]
+
+\begin{itemize}
+\item \(f(x)\) fully specified and deterministic
+\item \(F\) is deterministic
+\item \(F\) cannot be computed analytically
+\end{itemize}
+\end{frame}
+\begin{frame}[label={sec:org5855cb7}]{Integration}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/integra.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:orgf4c7f8e}]{What we would like}
+\[
+p(F\mid Y)
+\]
+\begin{itemize}[<+->]
+\item given that I have seen data \(Y\) what is my belief about the integral
+\item allows for "active learning"
+\item exploration/exploitation etc.
+\end{itemize}
+\end{frame}
+\begin{frame}[label={sec:orge695878}]{Emulation}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/06/bo-aq-int-gp-15.png}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org8dfecda}]{Quadrature}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/bayesian-quadrature-intuition-00.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org98df982}]{Quadrature}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/bayesian-quadrature-intuition-01.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org16751b8}]{Quadrature}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/bayesian-quadrature-intuition-02.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:orgd7ec559}]{Quadrature}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/bayesian-quadrature-intuition-03.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:orgcdc6037}]{Quadrature}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/bayesian-quadrature-intuition-04.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:orgf45f7e9}]{Quadrature}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/bayesian-quadrature-intuition-05.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org024ee61}]{Quadrature}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/07/bayesian-quadrature-intuition-06.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org6f748c9}]{Model}
+\[
+F := \int_{-3}^3 \underbrace{e^{-(sin(3x))^2-x^2}}_{f(x)}\textrm{d}x
+\]
+\alert{Knowledge}
+\begin{itemize}
+\item \(f(x)\) strictly positive \(\Rightarrow\) \(F>0\)
+\item bounded above by,
+\[
+  f(x) \leq e^{-x^2}
+  \]
+\item Therefore,
+\[
+  0< F < \int_{-\infty}^{\infty} e^{-x^2} \textrm{d}x = \sqrt{\pi}
+  \]
+\end{itemize}
+\end{frame}
+\begin{frame}[label=dataandknowledge]{}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/data11.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org53ef3f3}]{Integration}
+\[
+F := \int f(x) \textrm{d}\nu(x)
+\]
+\begin{itemize}
+\item \(\nu(x)\) is the measure that we are integrating over
+\end{itemize}
+\end{frame}
+\begin{frame}[label={sec:org164b0da}]{Bayesian Quadrature [\cite{OHagan1991}]}
+\begin{align}
+p(F, Y) &= \int p(F\mid f)p(Y\mid f)p(f)\textrm{d}f
+\only<2->{\\&=\int \delta\left(F-\int_{\mathcal{X}} f\textrm{d}x \right)\prod_{i}^N \delta(y_i - f(x_i))p(f)\textrm{d}f}
+\end{align}
+\end{frame}
+\begin{frame}[label={sec:org912d120}]{Bayesian Quadrature [\cite{OHagan1991}]}
+\[
+p\left( \begin{array}{c} Y \\ F\end{array} \right) = \mathcal{N}\left(\left[\begin{array}{c}\mathbf{m}_X\\\int m_X(x)\textrm{d}x\end{array}\right],\left[\begin{array}{cc}k(X,X) & \int k(X,x)\textrm{d}x\\\int k(x,X)\textrm{d}x & \int\int k(x,x')\textrm{d}x\textrm{d}x'\end{array}\right]\right)
+\]
+\begin{itemize}[<+->]
+\item We can derive \(p(F\mid Y)\) through our normal conditioning procedure
+\item \(p(F\mid Y) = \mathcal{N}(\mu_F, k_F)\) is a uni-variate Gaussian
+\end{itemize}
+\end{frame}
+\begin{frame}[label={sec:org88cdfaa}]{Bayesian Quadrature}
+\[
+p\left( \begin{array}{c} Y \\ F\end{array} \right) = \mathcal{N}\left(\left[\begin{array}{c}\mathbf{m}_X\\\int m_X(x)\textrm{d}x\end{array}\right],\left[\begin{array}{cc}k(X,X) & \int k(X,x)\textrm{d}x\\\int k(x,X)\textrm{d}x & \int\int k(x,x')\textrm{d}x\textrm{d}x'\end{array}\right]\right)
+\]
+\begin{itemize}
+\item We can derive \(p(F\mid Y)\) through our normal conditioning procedure
+\item \(p(F\mid Y) = \mathcal{N}(\mu_F, k_F)\) is a uni-variate Gaussian
+\end{itemize}
+\end{frame}
+\begin{frame}[label={sec:org10026a7}]{Statistical Inference}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/bq-inference0.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org45027d1}]{Statistical Inference}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/bq-inference1.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org7f2aa25}]{Statistical Inference}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/bq-inference2.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org8e41aab}]{Statistical Inference}
+\begin{center}
+\includegraphics[width=.9\linewidth]{./bin/lectures/bq-inference3.png}
+\label{}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org62dfcb8}]{Bayesian Quadrature}
+\[
+p\left( \begin{array}{c} Y \\ F\end{array} \right) = \mathcal{N}\left(\left[\begin{array}{c}\mathbf{m}_X\\\int m_X(x)\textrm{d}x\end{array}\right],\left[\begin{array}{cc}k(X,X) & \int k(X,x)\textrm{d}x\\\int k(x,X)\textrm{d}x & \int\int k(x,x')\textrm{d}x\textrm{d}x'\end{array}\right]\right)
+\]
+\begin{itemize}
+\item We can derive \(p(F\mid Y)\) through our normal conditioning procedure
+\item \(p(F\mid Y) = \mathcal{N}(\mu_F, k_F)\) is a uni-variate Gaussian
+\item \(p(Y\mid F) = \mathcal{N}(\mu_Y, k_Y)\) \alert{is a Gaussian process}
+\end{itemize}
+\end{frame}
+\begin{frame}[label={sec:org7c6ff1a}]{Integral Constrained Samples}
+\begin{center}
+\includegraphics[height=0.7\textheight]{./bin/lectures/07/quadrature_eq1.png}
+\label{}
+\end{center}
+
+\[
+F=4.0
+\]
+\end{frame}
+\begin{frame}[label={sec:orgf9a508a}]{Integral Constrained Samples}
+\begin{center}
+\includegraphics[height=0.7\textheight]{./bin/lectures/07/quadrature_eq2.png}
+\label{}
+\end{center}
+
+\[
+F=1.0
+\]
+\end{frame}
+\begin{frame}[label={sec:orgf664945}]{Information Operator\footnote{sometimes called a "Design Rule"}}
+\begin{center}
+\includegraphics[height=0.45\textheight]{./bin/lectures/07/bayesian-quadrature-intuition-04.png}
+\end{center}
+\begin{description}
+\item[{Integrand variance}] \(\alpha(x) = k(x,x)\)
+\item[{Integral Variance Reduction }] \(\alpha(x) = k_F(X,X) - k_F(X,x)\)
+\end{description}
+\end{frame}
+\begin{frame}[label={sec:org9611865}]{Choice of Covariance}
+\begin{center}
+\includegraphics[height=0.7\textheight]{./bin/lectures/07/quadrature-covariance-samples.png}
+\label{}
+\end{center}
+
+
+\[
+p(f) = \mathcal{GP}\left(\boldsymbol{0}, \theta^2(\operatorname{min}(x,x')-\kappa)\right)
+\]
+\end{frame}
+\begin{frame}[label={sec:orge7fa9f9}]{Quadrature Rule}
+\[
+\mathbb{E}[F] = \mathbb{E}_{p(f\mid Y)} \left[\int f(x)\textrm{d}x \right] = \sum_{i=1}^{N-1}\frac{x_{i+1}-x_i}{2}(f(x_{i+1})+f(x_i))
+\]
+\begin{itemize}
+\item <2-> This is the normal trapezoid rule!!!
+\item <3-> The algorithm is now tied to \alert{our belief} in the function!!!!
+\item <4-> We can do inference over where to sample!!!!!!!!
+\end{itemize}
+\end{frame}
+\begin{frame}[label={sec:org68e718b}]{Trapedzoid Rule}
+\begin{definition}[Trapedzoid Rule]\label{sec:org71b3b70}
+The trapezoidal rule is the posterior mean estimate for the integral \(F = \int_{a}^{b} f(x)\textrm{d}x\) under any centred Wiener process prior \(p(f) = \mathcal{GP}(0,k)\) with \(k(x, x′) = \theta^2(\operatorname{min}(x,x')-\kappa)\)
+\end{definition}
+\end{frame}
+\begin{frame}[label={sec:org929b7d6}]{}
+\begin{center}
+\includegraphics[height=0.7\textheight]{bin/lectures/07/notimpressed.jpg}
+\end{center}
+\end{frame}
+\begin{frame}[label=scientificprinciple]{The Scientific Principle}
+\begin{center}
+\includegraphics[height=0.7\textheight]{./bin/lectures/02/scientificprinciple.pdf}
+\label{}
+\end{center}
+\begin{center}
+Data + Model \(\overbrace{\rightarrow}^{Compute}\) Prediction
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:orgba271df}]{Trapedzoid Rule}
+In calculus, the trapezoidal rule is a technique for numerical integration, i.e. approximating the definite integral:
+\[
+\int_{a}^{b}f(x)\textrm{d}x
+\]
+The trapezoidal rule works by approximating the region under the graph of the function \(f(x)\) as a trapezoid and calculating its area. This is easily calculated by noting that the area of the region is made up of a rectangle with width \(b-a\)  and height \(f(a)\) and a triangle of width \(b-a\) and height \(f(b)-f(a)\)
+\end{frame}
+\begin{frame}[label={sec:orgc09faf6}]{Least Squares Regression}
+\begin{center}
+\includegraphics[height=0.6\textheight]{./bin/lectures/07/linreg_posterior10.png}
+\label{}
+\end{center}
+
+
+\begin{description}
+\item[{Legendre (1805)}] algorithm that reduces "error"
+\item[{Gauss (1809)}] statistical model assuming i.i.d. Gaussian noise
+\end{description}
+\end{frame}
+\begin{frame}[label={sec:org2bec142}]{Factor Analysis}
+\begin{center}
+\includegraphics[height=0.5\textheight]{./bin/lectures/07/fa.png}
+\label{}
+\end{center}
+
+\begin{description}
+\item[{Spearman (1904)}] proposed an algorithm to extract "factors" from data \cite{Spearman:1904tx}
+\item[{Hotelling (1936)}] concept of factor \alert{is} clearly defined through a statistical model \cite{Hotelling:1933ki}
+\end{description}
+\end{frame}
+\begin{frame}[label={sec:orgc262929},fragile]{Why Probabilistic Numerics? \texttt{scipy.optimize.minimize}}
+ \begin{minted}[]{python}
+def minimize(fun, x0, args=(), method=None,
+             jac=None, hess=None,
+             hessp=None, bounds=None,
+             constraints=(), tol=None,
+             callback=None, options=None):
+\end{minted}
+\begin{description}
+\item[{\alert{method}}] \texttt{Nelder-Mead}, \texttt{Powell}, \texttt{CG}, \texttt{BFGS}, \texttt{Newton-CG}, \texttt{L-BFGS-B}, \texttt{TNC} , \texttt{COBYLA} , \texttt{SLSQP} , \texttt{trust-constr} , \texttt{dogleg} , \texttt{trust-ncg} , \texttt{trust-exact} , \texttt{trust-krylov}
+\end{description}
+\end{frame}
+\begin{frame}[label={sec:orgd452766}]{Probabilistic Numerics [\cite{Hennig:2015jf}]}
+\begin{itemize}[<+->]
+\item There are tons of numerical algorithms for every problem under the sun
+\item They work really well
+\item They give different results on the same problem
+\item \emph{what is the prior they implement?}
+\end{itemize}
+\end{frame}
+\begin{frame}[label={sec:org8b1fbbb}]{\href{https://parameterfree.com/2020/12/06/neural-network-maybe-evolved-to-make-adam-the-best-optimizer/}{Neural Networks (Maybe) Evolved to Make Adam The Best Optimizer}}
+\emph{In a talk, Olivier Bousquet has described the deep learning community as a giant genetic algorithm: Researchers in this community are exploring the space of all variants of algorithms and architectures in a semi-random way. Things that consistently work in large experiments are kept, the ones not working are discarded. \ldots{}.
+\ldots{}\ldots{}\ldots{}\ldots{}\ldots{}..
+the community is evolving only one set of parameters (architectures, initialization strategies, hyperparameters search algorithms, etc.) keeping most of the time the optimizer fixed to Adam.}
+\end{frame}
+\begin{frame}[label={sec:org6915faf}]{"The Machine Learning Principle"\footnote{\cite{Chomsky:1980ud}}}
+\begin{quotation} %% Noam Chomsky
+"There is a notion of success \ldots{} which I think is novel in the history of science. It interprets success as approximating unanalyzed data."
+
+-- Prof. Noam Chomsky
+\end{quotation}
+\end{frame}
+\begin{frame}[label={sec:orgcc15372}]{}
+\begin{center}
+\includegraphics[height=0.7\textheight]{./bin/lectures/07/slicedbread.png}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org1c9cb8a}]{Assumptions: Algorithms}
+\begin{columns}
+\begin{column}{0.32\columnwidth}
+\begin{center}
+\includegraphics[width=.9\linewidth]{bin/lectures/02/eyepatch.png}
+\end{center}
+\end{column}
+\begin{column}{0.32\columnwidth}
+\begin{center}
+\includegraphics[width=.9\linewidth]{bin/lectures/02/clownshoes.jpeg}
+\end{center}
+\end{column}
+\begin{column}{0.32\columnwidth}
+\begin{center}
+\includegraphics[width=.9\linewidth]{bin/lectures/02/ministrysillywalks3.png}
+\end{center}
+\end{column}
+\end{columns}
+\begin{block}{Statistical Learning}
+\[
+\textcolor{red}{\mathcal{A}}_{\mathcal{H}}(\mathcal{S})
+\]
+\end{block}
+\end{frame}
+\section{Summary}
+\label{sec:orgb461d5e}
+\begin{frame}[label={sec:org5f4f809}]{Summary}
+\begin{itemize}[<+->]
+\item Probabilistic Numerics extends the notion of statistical inference to \alert{computation}\footnote{these thoughts have been around for a long time}
+\item Computation is the process of extracting a latent property, machine learning is the statistical process of updating beliefs about latent properties
+\item Computation is often not "truth" therefore we should quantify our ignorance about its results
+\item Why?
+\begin{itemize}
+\item efficiency
+\item down-stream tasks, uncertainty in computation should be part of decision
+\item learning/understanding algorithms in relation to problems/data
+\end{itemize}
+\end{itemize}
+\end{frame}
+\begin{frame}[label={sec:org22a6010}]{When computation was expensive}
+\begin{description}[<+->]
+\item[{Albert Valentionvic Suldin (1924-1996)}] worked on error minimising estimators for numerical algorithms, how to \alert{design} algorithms from a statistical perspective
+\item[{Frederick Michael Larkin (1936-1982)}] incorporating the notion of \alert{prior} knowledge into numerical algorithms to make robust calculations
+\end{description}
+\end{frame}
+\begin{frame}[label={sec:org31b7472}]{}
+\begin{center}
+\includegraphics[height=0.7\textheight]{bin/lectures/07/pn-book.jpg}
+\end{center}
+
+\begin{center}
+\url{http://probnumschool.org}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:orge5c9dd1}]{}
+\begin{center}
+\alert{eof}
+\end{center}
+\end{frame}
+\begin{frame}[label={sec:org93a39a4}]{Is BO PN?}
+\begin{center}
+\includegraphics[height=0.5\textheight]{./bin/lectures/07/statisticallearning8.pdf}
+\label{}
+\end{center}
+
+
+\begin{description}[<+->]
+\item[{Yes}] it uses a probablistic model as a proxy for decision loop
+\item[{No}] the probabilistic model is not over the quantity of interest
+\end{description}
+\end{frame}
+\begin{frame}[label=cockayne3]{Formalisation}
+\begin{center}
+\includegraphics[height=0.6\textheight]{./bin/lectures/07/statisticallearning2.pdf}
+\label{}
+\end{center}
+
+\[
+A\circ\mathcal{S}=\tilde{p}(\mathcal{D}) \approx p(\mathcal{D})
+\]
+\end{frame}
+\begin{frame}[allowframebreaks]{}
+ \printbibliography
+\end{frame}
+\end{document}
